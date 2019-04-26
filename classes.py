@@ -65,7 +65,7 @@ class DirMap(Database):
         for dir_path in gen_find_dir(top, filepat):
             i += 1
             dir_path_d[i] = os.path.abspath(dir_path)
-            data = info_getter(os.path.abspath(dir_path), **kwagrs)
+            data = info_getter(os.path.abspath(dir_path), **kwargs)
             df_data.append(data)
 
         info_df = pd.DataFrame(
@@ -106,32 +106,20 @@ class SFSDirMap(DirMap):
     def gen_sfs_dir(self, sort_by='', ascending=True, **kwargs):
         filt_df =self.filter(sort_by, ascending, **kwargs)
         id_list = list(filt_df.index)
-        sfs_id_memo = []
 
         for i in id_list:
             sfs_id = filt_df.loc[i, 'sfs_id']
 
-            if sfs_id in sfs_id_memo:
-                continue
-            
-            sfs_id_memo.append(sfs_id)
-            
-            yield sfs_id, self._d[sfs_id]['sfs_dir']
+            yield self.df.loc[i], self._d[sfs_id]['sfs_dir']
 
     def gen_sfs_table(self, sort_by='', ascending=True, **kwargs):
         filt_df =self.filter(sort_by, ascending, **kwargs)
         id_list = list(filt_df.index)
-        sfs_id_memo = []
 
         for i in id_list:
             sfs_id = filt_df.loc[i, 'sfs_id']
-
-            if sfs_id in sfs_id_memo:
-                continue
             
-            sfs_id_memo.append(sfs_id)
-            
-            yield sfs_id, self._d[sfs_id]['sfs_table']
+            yield self.df.loc[i], self._d[sfs_id]['sfs_table']
 
 
     def get_DirMap(self, top, sfs_format, site_type_pos, scale=100, description='', 
@@ -334,9 +322,9 @@ class SFSDirMap(DirMap):
     
     def __getitem__(self, key):
         if key == '*':
-            return self._d
+            return self.df
         else:
-            return self._d[key]
+            return self.filter(sfs_id=key)
         # elif isinstance(key, (tuple, list)):
         #     for k in key:
         #         yield self.df.loc[k, :]
