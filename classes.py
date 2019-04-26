@@ -1,6 +1,7 @@
 """ Classes for managing paths in tree structure. """
 
 import os
+import pickle
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -10,12 +11,13 @@ from popgen.reader import parse_genebygene_SFS_file, genebygeneSFS_to_FDboot
 from popgen.formatter import filter_gbgSFS
 from popgen.statistics import tests
 
-def DirMap(Database):
+class DirMap(Database):
     """ Creates DirMap object which inherits from Database class. """
 
     def __init__(self, top, filepat, info_getter, columns=[], description=''):
         self.df, self._d = self.get_DirMap(
             top, filepat, info_getter, columns, description)
+        self.top = top
         self.description = description
 
     def gen_dir(self, sort_by='', ascending=True, **kwargs):
@@ -71,22 +73,39 @@ def DirMap(Database):
 
         return info_df, dir_path_d
 
-def SFSDirMap(DirMap):
+    def to_files(self):
+        # Save df
+        df_path = os.path.join(
+            self.top, '{name}_{desc}_df.csv'.format(
+                desc=self.description, name=type(self).__name__)
+            )
+        self.df.to_csv(df_path, index=False)
+
+        # Save data
+        pickle_path = os.path.join(
+            self.top, '{name}_{desc}_d.pickle'.format(
+                desc=self.description, name=type(self).__name__)
+            )
+        with open(pickle_path, 'wb') as f:
+            pickle.dump(self._d, f)
+
+class SFSDirMap(DirMap):
     """ Creates SFSDirMap object which inherits from DirMap class. 
     This object is composed of a DataFrame containing dataset info and SFS data,
     and a dictionary containing corresponding a directory path for the dataset. """
 
-    def __init__(self, top, filepat, sfs_format, site_type_pos, 
-                 columns=[], description=''):
+    def __init__(self, top, sfs_format, site_type_pos, scale=100, 
+                 description='', gene_list=[], gene_match_func=None):
         self.df, self._d = self.get_DirMap(
             top, sfs_format, site_type_pos, scale=100, description='', 
             gene_list=[], gene_match_func=None
         )
+        self.top = top
         self.description = description
 
     def gen_sfs_dir(self, sort_by='', ascending=True, **kwargs):
         filt_df =self.filter(sort_by, ascending, **kwargs)
-        id_list = list(filt_df)
+        id_list = list(filt_df.index)
         sfs_id_memo = []
 
         for i in id_list:
@@ -101,7 +120,7 @@ def SFSDirMap(DirMap):
 
     def gen_sfs_table(self, sort_by='', ascending=True, **kwargs):
         filt_df =self.filter(sort_by, ascending, **kwargs)
-        id_list = list(filt_df)
+        id_list = list(filt_df.index)
         sfs_id_memo = []
 
         for i in id_list:
@@ -167,8 +186,9 @@ def SFSDirMap(DirMap):
             # Get dataset info
             data_info_d = self._sfs_info_formatter(sfs_data_dir, site_type_pos)
             # Get SFS table
-            sfs_table = _sfs_data_reader(
-                sfs_data_dir, sfs_format, gene_list, gene_match_func)
+            sfs_table = self._sfs_data_reader(
+                sfs_data_dir, sfs_format, data_info_d['species'], 
+                gene_list, gene_match_func)
 
             i += 1
             dir_path_d[i] = {
@@ -182,15 +202,15 @@ def SFSDirMap(DirMap):
                 
                 if mutation1 not in sfs_table.columns:
                     continue
-                elif aa in mutation_d_2f:
-                    if mutation2 != mutation_d_2f[aa]:
+                elif data_info_d['aa'] in mutation_d_2f:
+                    if mutation2 != mutation_d_2f[data_info_d['aa']]:
                         continue
                 
                 sfs1 = sfs_table[mutation1]
                 sfs2 = sfs_table[mutation2]
                 assert len(sfs1) == len(sfs2)
-                
-                x = list(range(1, len(sfs1)+1))
+
+                x = list(range(1, len(sfs1)))
                 x1 = tests.fd2data(x, sfs1.iloc[:-1], scale)
                 x2 = tests.fd2data(x, sfs2.iloc[:-1], scale)
                 n1, n2 = sum(sfs1.iloc[:-1]), sum(sfs2.iloc[:-1])
@@ -204,7 +224,7 @@ def SFSDirMap(DirMap):
                 chr_list.append(data_info_d['chr'])
                 trim_list.append(data_info_d['trim'])
                 comp_str_list.append('_vs_'.join(
-                    data_info_d['comp_str'].split('_')[1:]))
+                    comp_mut.split('_')[1:]))
                 comp_id_list.append(int(comp_mut.split('_')[0]))
                 n1_list.append(n1)
                 n2_list.append(n2)
@@ -241,9 +261,9 @@ def SFSDirMap(DirMap):
                 return aad_d[x['aa']]
             except KeyError:
                 return -9
-        info_fd['aad'] = info_fd.apply(lambda x: func(x, aad_d), axis=1)
+        info_df['aad'] = info_df.apply(lambda x: func(x, aad_d), axis=1)
 
-        info_fd = info_df\
+        info_df = info_df\
             .sort_values(by=['chr', 'site_type', 'trim', 'cod_type', 
                              'species', 'aad', 'comp'])\
             .loc[:, ['species', 'site_type', 'chr', 'trim', 'cod_type', 
@@ -302,7 +322,7 @@ def SFSDirMap(DirMap):
             'cod_type': cod_type,
             'aa': aa,
             'species': species,
-            'chr_name': chr_name,
+            'chr': chr_name,
             'trim': trim
         }
 
