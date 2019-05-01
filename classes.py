@@ -94,7 +94,8 @@ class SFSDirMap(DirMap):
     This object is composed of a DataFrame containing dataset info and SFS data,
     and a dictionary containing corresponding a directory path for the dataset. """
 
-    def __init__(self, top, sfs_format, site_type_pos, scale=100, 
+    def __init__(self, top='', sfs_format='', site_type_pos=None, scale=100, 
+                 df_path='', pickle_path='',
                  description='', gene_list=[], gene_match_func=None):
         self.df, self._d = self.get_DirMap(
             top, sfs_format, site_type_pos, scale=100, description='', 
@@ -328,4 +329,3 @@ class SFSDirMap(DirMap):
         # elif isinstance(key, (tuple, list)):
         #     for k in key:
         #         yield self.df.loc[k, :]
-    
