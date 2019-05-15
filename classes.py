@@ -121,6 +121,35 @@ class SFSDirMap(DirMap):
             
             yield self.df.loc[i], self._d[sfs_id]['sfs_table']
 
+    @staticmethod
+    def _sfs_info_formatter(sfs_data_dir, site_type_pos):
+        if sfs_data_dir.split('/')[site_type_pos] != 'SI':
+            site_type = 'CDS'
+        else:
+            site_type = 'SI'
+            
+        if site_type == 'CDS':
+            cod_type = sfs_data_dir.split('/')[site_type_pos+2]
+            aa = sfs_data_dir.split('/')[site_type_pos+3].split('_')[0]
+            species = sfs_data_dir.split('/')[site_type_pos+6][:2]
+        else:
+            cod_type = -9
+            aa = -9
+            species = sfs_data_dir.split('/')[site_type_pos+4][:2]
+        chr_name = sfs_data_dir.split('/')[site_type_pos+1].split('_')[1]
+        try:
+            trim = sfs_data_dir.split('/')[site_type_pos+1].split('_')[3]
+        except:
+            trim = -9
+
+        return {
+            'site_type': site_type,
+            'cod_type': cod_type,
+            'aa': aa,
+            'species': species,
+            'chr': chr_name,
+            'trim': trim
+        }
 
     def get_DirMap(self, top, sfs_format, site_type_pos, scale=100, description='', 
                    gene_list=[], gene_match_func=None):
@@ -284,35 +313,6 @@ class SFSDirMap(DirMap):
             )
         
         return fd_boot.get_fdd(bin_num=1, rep_num=0)
-
-    def _sfs_info_formatter(self, sfs_data_dir, site_type_pos):
-        if sfs_data_dir.split('/')[site_type_pos] != 'SI':
-            site_type = 'CDS'
-        else:
-            site_type = 'SI'
-            
-        if site_type == 'CDS':
-            cod_type = sfs_data_dir.split('/')[site_type_pos+2]
-            aa = sfs_data_dir.split('/')[site_type_pos+3].split('_')[0]
-            species = sfs_data_dir.split('/')[site_type_pos+6][:2]
-        else:
-            cod_type = -9
-            aa = -9
-            species = sfs_data_dir.split('/')[site_type_pos+4][:2]
-        chr_name = sfs_data_dir.split('/')[site_type_pos+1].split('_')[1]
-        try:
-            trim = sfs_data_dir.split('/')[site_type_pos+1].split('_')[3]
-        except:
-            trim = -9
-
-        return {
-            'site_type': site_type,
-            'cod_type': cod_type,
-            'aa': aa,
-            'species': species,
-            'chr': chr_name,
-            'trim': trim
-        }
 
     def __len__(self):
         return len(self._d)
