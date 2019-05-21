@@ -17,7 +17,6 @@ class DirMap(Database):
     def __init__(self, top, filepat, info_getter, columns=[], description=''):
         self.df, self._d = self.get_DirMap(
             top, filepat, info_getter, columns, description)
-        self.top = top
         self.description = description
 
     def gen_dir(self, sort_by='', ascending=True, **kwargs):
@@ -73,17 +72,17 @@ class DirMap(Database):
 
         return info_df, dir_path_d
 
-    def to_files(self):
+    def to_files(self, out_dir):
         # Save df
         df_path = os.path.join(
-            self.top, '{name}_{desc}_df.csv'.format(
+            out_dir, '{name}_{desc}_df.csv'.format(
                 desc=self.description, name=type(self).__name__)
             )
         self.df.to_csv(df_path, index=False)
 
         # Save data
         pickle_path = os.path.join(
-            self.top, '{name}_{desc}_d.pickle'.format(
+            out_dir, '{name}_{desc}_d.pickle'.format(
                 desc=self.description, name=type(self).__name__)
             )
         with open(pickle_path, 'wb') as f:
@@ -94,13 +93,18 @@ class SFSDirMap(DirMap):
     This object is composed of a DataFrame containing dataset info and SFS data,
     and a dictionary containing corresponding a directory path for the dataset. """
 
-    def __init__(self, top, sfs_format, site_type_pos, scale=100, 
+    def __init__(self, csv_path='', pickle_path='', top='', sfs_format='', 
+                 site_type_pos=None, scale=100,
                  description='', gene_list=[], gene_match_func=None):
-        self.df, self._d = self.get_DirMap(
-            top, sfs_format, site_type_pos, scale=100, description='', 
-            gene_list=[], gene_match_func=None
-        )
-        self.top = top
+        if csv_path:
+            self.load_DirMap_from_files(
+                csv_path, pickle_path)
+        else:
+            self.df, self._d = self.get_DirMap(
+                top, sfs_format, site_type_pos, scale=scale, 
+                description=description, 
+                gene_list=gene_list, gene_match_func=gene_match_func
+            )
         self.description = description
 
     def gen_sfs_dir(self, sort_by='', ascending=True, **kwargs):
@@ -154,9 +158,21 @@ class SFSDirMap(DirMap):
             'filt_code': filt_code,
             'trim': trim
         }
+    def load_DirMap_from_files(self, csv_path, pickle_path):
+        """ Load data from csv and pickle files if data does not exist 
+        in the object. """
+        if hasattr(self, 'df'):
+            raise AttributeError('"df" attribute exists. Loading failed.')
 
-    def get_DirMap(self, top, sfs_format, site_type_pos, scale=100, description='', 
-                   gene_list=[], gene_match_func=None):
+        if hasattr(self, '_d'):
+            raise AttributeError('"_d" attribute exists. Loading failed.')
+
+        self.df = pd.read_csv(csv_path)
+        with open(pickle_path, 'rb') as f:
+            self._d = pickle.load(f)
+
+    def get_DirMap(self, top, sfs_format, site_type_pos, scale=100, 
+                   description='', gene_list=[], gene_match_func=None):
 
         if sfs_format == 'gbgSFS':
             filepat = 'estimated_SFS+fixations_of_each_gene_0.txt'
@@ -337,4 +353,3 @@ class SFSDirMap(DirMap):
         # elif isinstance(key, (tuple, list)):
         #     for k in key:
         #         yield self.df.loc[k, :]
-    
