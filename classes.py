@@ -136,7 +136,10 @@ class SFSDirMap(DirMap):
             cod_type = -9
             aa = -9
             species = sfs_data_dir.split('/')[site_type_pos+4][:2]
+
         chr_name = sfs_data_dir.split('/')[site_type_pos+1].split('_')[1]
+        filt_code = sfs_data_dir.split('/')[site_type_pos+1].split('_')[2]
+
         try:
             trim = sfs_data_dir.split('/')[site_type_pos+1].split('_')[3]
         except:
@@ -148,6 +151,7 @@ class SFSDirMap(DirMap):
             'aa': aa,
             'species': species,
             'chr': chr_name,
+            'filt_code': filt_code,
             'trim': trim
         }
 
@@ -171,6 +175,7 @@ class SFSDirMap(DirMap):
         aa_list = []
         species_list = []
         chr_list = []
+        filt_code_list = []
         trim_list = []
         comp_str_list = []
         comp_id_list = []
@@ -239,6 +244,7 @@ class SFSDirMap(DirMap):
                 aa_list.append(data_info_d['aa'])
                 species_list.append(data_info_d['species'])
                 chr_list.append(data_info_d['chr'])
+                filt_code_list.append(data_info_d['filt_code'])
                 trim_list.append(data_info_d['trim'])
                 comp_str_list.append('_vs_'.join(
                     comp_mut.split('_')[1:]))
@@ -259,6 +265,7 @@ class SFSDirMap(DirMap):
                 'aa': aa_list,
                 'species': species_list,
                 'chr': chr_list,
+                'filt_code': filt_code_list,
                 'trim': trim_list,
                 'comp_str': comp_str_list,
                 'comp': comp_id_list,
@@ -283,10 +290,12 @@ class SFSDirMap(DirMap):
         info_df = info_df\
             .sort_values(by=['chr', 'site_type', 'trim', 'cod_type', 
                              'species', 'aad', 'comp'])\
-            .loc[:, ['species', 'site_type', 'chr', 'trim', 'cod_type', 
+            .loc[:, ['species', 'site_type', 'chr', 'filt_code', 'trim', 'cod_type', 
                      'aa', 'aad', 'comp', 'comp_str', 'n1', 'n2', 
                      'total_n', 'mean1', 'mean2', 
                      'mwu_sc100_z', 'mwu_sc100_p', 'sfs_id']]
+        
+        info_df.reset_index(drop=True, inplace=True)
 
         return info_df, dir_path_d
             
