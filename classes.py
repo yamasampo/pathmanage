@@ -242,7 +242,7 @@ class SFSDirMap(DirMap):
                 mutation1 = comp_mut.split('_')[1]
                 mutation2 = comp_mut.split('_')[2]
                 
-                if mutation1 not in sfs_table.columns:
+                if mutation1 not in sfs_table.index:
                     continue
                 elif data_info_d['aa'] in mutation_d_2f:
                     if mutation2 != mutation_d_2f[data_info_d['aa']]:
@@ -311,17 +311,16 @@ class SFSDirMap(DirMap):
 
         info_df = info_df\
             .sort_values(by=['chr', 'site_type', 'trim', 'cod_type', 
-                             'species', 'aad', 'comp'])\
+                             'species', 'aad', 'geneset', 'comp'])\
             .loc[:, ['species', 'site_type', 'chr', 'filt_code', 'trim', 'cod_type', 
-                     'aa', 'aad', 'comp', 'comp_str', 'n1', 'n2', 
+                     'aa', 'aad', 'geneset', 'comp', 'comp_str', 'n1', 'n2', 
                      'total_n', 'mean1', 'mean2', 
                      'mwu_sc100_z', 'mwu_sc100_p', 'sfs_id']]
         
         info_df.reset_index(drop=True, inplace=True)
 
         return info_df, dir_path_d
-            
-
+    
     def _sfs_data_reader(self, sfs_data_dir, sfs_format, species, cod_type,
                          gene_list=[], gene_match_func=None, rep_num=1000):
         if sfs_format == 'gbgSFS':
