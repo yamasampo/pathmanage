@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from pathmanage.functions import gen_find_dir
-from popgen.classes import Database, FrequencyDistributionBootstrap
-from popgen.reader import parse_genebygene_SFS_file, genebygeneSFS_to_FDboot
+from popgen.classes import Database, SFS
+from popgen.reader import parse_genebygene_SFS_file
 from popgen.formatter import filter_gbgSFS
 from popgen.statistics import tests
 
@@ -17,7 +17,6 @@ class DirMap(Database):
     def __init__(self, top, filepat, info_getter, columns=[], description=''):
         self.df, self._d = self.get_DirMap(
             top, filepat, info_getter, columns, description)
-        self.top = top
         self.description = description
 
     def gen_dir(self, sort_by='', ascending=True, **kwargs):
@@ -73,17 +72,17 @@ class DirMap(Database):
 
         return info_df, dir_path_d
 
-    def to_files(self):
+    def to_files(self, out_dir):
         # Save df
         df_path = os.path.join(
-            self.top, '{name}_{desc}_df.csv'.format(
+            out_dir, '{name}_{desc}_df.csv'.format(
                 desc=self.description, name=type(self).__name__)
             )
         self.df.to_csv(df_path, index=False)
 
         # Save data
         pickle_path = os.path.join(
-            self.top, '{name}_{desc}_d.pickle'.format(
+            out_dir, '{name}_{desc}_d.pickle'.format(
                 desc=self.description, name=type(self).__name__)
             )
         with open(pickle_path, 'wb') as f:
@@ -94,13 +93,18 @@ class SFSDirMap(DirMap):
     This object is composed of a DataFrame containing dataset info and SFS data,
     and a dictionary containing corresponding a directory path for the dataset. """
 
-    def __init__(self, top, sfs_format, site_type_pos, scale=100, 
+    def __init__(self, csv_path='', pickle_path='', top='', sfs_format='', 
+                 site_type_pos=None, scale=100,
                  description='', gene_list=[], gene_match_func=None):
-        self.df, self._d = self.get_DirMap(
-            top, sfs_format, site_type_pos, scale=100, description='', 
-            gene_list=[], gene_match_func=None
-        )
-        self.top = top
+        if csv_path:
+            self.load_DirMap_from_files(
+                csv_path, pickle_path)
+        else:
+            self.df, self._d = self.get_DirMap(
+                top, sfs_format, site_type_pos, scale=scale, 
+                description=description, 
+                gene_list=gene_list, gene_match_func=gene_match_func
+            )
         self.description = description
 
     def gen_sfs_dir(self, sort_by='', ascending=True, **kwargs):
@@ -121,18 +125,64 @@ class SFSDirMap(DirMap):
             
             yield self.df.loc[i], self._d[sfs_id]['sfs_table']
 
+    @staticmethod
+    def _sfs_info_formatter(sfs_data_dir, site_type_pos):
+        site_type = sfs_data_dir.split('/')[site_type_pos]
 
-    def get_DirMap(self, top, sfs_format, site_type_pos, scale=100, description='', 
-                   gene_list=[], gene_match_func=None):
+        if site_type == 'CDS':
+            cod_type = sfs_data_dir.split('/')[site_type_pos+2]
+            aa = sfs_data_dir.split('/')[site_type_pos+3].split('_')[0]
+            species = sfs_data_dir.split('/')[site_type_pos+6][:2]
+            geneset = sfs_data_dir.split('/')[site_type_pos+5]
+
+        else:
+            cod_type = -9
+            aa = -9
+            species = sfs_data_dir.split('/')[site_type_pos+4][:2]
+            geneset = sfs_data_dir.split('/')[site_type_pos+3]
+
+        chr_name = sfs_data_dir.split('/')[site_type_pos+1].split('_')[1]
+        filt_code = sfs_data_dir.split('/')[site_type_pos+1].split('_')[2]
+
+        try:
+            trim = sfs_data_dir.split('/')[site_type_pos+1].split('_')[3]
+        except:
+            trim = -9
+
+        return {
+            'site_type': site_type,
+            'cod_type': cod_type,
+            'aa': aa,
+            'species': species,
+            'chr': chr_name,
+            'filt_code': filt_code,
+            'trim': trim,
+            'geneset': geneset
+        }
+    def load_DirMap_from_files(self, csv_path, pickle_path):
+        """ Load data from csv and pickle files if data does not exist 
+        in the object. """
+        if hasattr(self, 'df'):
+            raise AttributeError('"df" attribute exists. Loading failed.')
+
+        if hasattr(self, '_d'):
+            raise AttributeError('"_d" attribute exists. Loading failed.')
+
+        self.df = pd.read_csv(csv_path)
+        with open(pickle_path, 'rb') as f:
+            self._d = pickle.load(f)
+
+    def get_DirMap(self, top, sfs_format, site_type_pos, scale=100, 
+                   description='', gene_list=[], gene_match_func=None):
 
         if sfs_format == 'gbgSFS':
             filepat = 'estimated_SFS+fixations_of_each_gene_0.txt'
 
-        elif sfs_format == 'fdBoot':
-            filepat = 'freqdist_boot_dat.csv'
+        elif sfs_format == 'df':
+            filepat = 'SFS_bootstrap_data.csv'
 
         else:
-            raise Exception('Wrong sfs_format. Please input "gbgSFS" or "fdBoot".')
+            raise Exception('Wrong sfs_format. Please input "gbgSFS" or "df".')
 
         i = 0
         dir_path_d = defaultdict(dict)
@@ -142,7 +192,9 @@ class SFSDirMap(DirMap):
         aa_list = []
         species_list = []
         chr_list = []
+        filt_code_list = []
         trim_list = []
+        geneset_list = []
         comp_str_list = []
         comp_id_list = []
         n1_list = []
@@ -171,12 +223,14 @@ class SFSDirMap(DirMap):
         aad_d = dict(zip(aa1, range(1, len(aa1)+1)))
 
         for sfs_data_dir in gen_find_dir(top, filepat):
+
+            print(sfs_data_dir)
             # Get dataset info
             data_info_d = self._sfs_info_formatter(sfs_data_dir, site_type_pos)
             # Get SFS table
             sfs_table = self._sfs_data_reader(
                 sfs_data_dir, sfs_format, data_info_d['species'], 
-                gene_list, gene_match_func)
+                data_info_d['cod_type'], gene_list, gene_match_func)
 
             i += 1
             dir_path_d[i] = {
@@ -188,14 +242,14 @@ class SFSDirMap(DirMap):
                 mutation1 = comp_mut.split('_')[1]
                 mutation2 = comp_mut.split('_')[2]
                 
-                if mutation1 not in sfs_table.columns:
+                if mutation1 not in sfs_table.index:
                     continue
                 elif data_info_d['aa'] in mutation_d_2f:
                     if mutation2 != mutation_d_2f[data_info_d['aa']]:
                         continue
                 
-                sfs1 = sfs_table[mutation1]
-                sfs2 = sfs_table[mutation2]
+                sfs1 = sfs_table.loc[mutation1]
+                sfs2 = sfs_table.loc[mutation2]
                 assert len(sfs1) == len(sfs2)
 
                 x = list(range(1, len(sfs1)))
@@ -210,7 +264,9 @@ class SFSDirMap(DirMap):
                 aa_list.append(data_info_d['aa'])
                 species_list.append(data_info_d['species'])
                 chr_list.append(data_info_d['chr'])
+                filt_code_list.append(data_info_d['filt_code'])
                 trim_list.append(data_info_d['trim'])
+                geneset_list.append(data_info_d['geneset'])
                 comp_str_list.append('_vs_'.join(
                     comp_mut.split('_')[1:]))
                 comp_id_list.append(int(comp_mut.split('_')[0]))
@@ -230,7 +286,9 @@ class SFSDirMap(DirMap):
                 'aa': aa_list,
                 'species': species_list,
                 'chr': chr_list,
+                'filt_code': filt_code_list,
                 'trim': trim_list,
+                'geneset': geneset_list,
                 'comp_str': comp_str_list,
                 'comp': comp_id_list,
                 'n1': n1_list,
@@ -253,66 +311,40 @@ class SFSDirMap(DirMap):
 
         info_df = info_df\
             .sort_values(by=['chr', 'site_type', 'trim', 'cod_type', 
-                             'species', 'aad', 'comp'])\
-            .loc[:, ['species', 'site_type', 'chr', 'trim', 'cod_type', 
-                     'aa', 'aad', 'comp', 'comp_str', 'n1', 'n2', 
+                             'species', 'aad', 'geneset', 'comp'])\
+            .loc[:, ['species', 'site_type', 'chr', 'filt_code', 'trim', 'cod_type', 
+                     'aa', 'aad', 'geneset', 'comp', 'comp_str', 'n1', 'n2', 
                      'total_n', 'mean1', 'mean2', 
                      'mwu_sc100_z', 'mwu_sc100_p', 'sfs_id']]
+        
+        info_df.reset_index(drop=True, inplace=True)
 
         return info_df, dir_path_d
-            
-
-    def _sfs_data_reader(self, sfs_data_dir, sfs_format, species,
-                         gene_list=[], gene_match_func=None, rep_num=None):
+    
+    def _sfs_data_reader(self, sfs_data_dir, sfs_format, species, cod_type,
+                         gene_list=[], gene_match_func=None, rep_num=1000):
         if sfs_format == 'gbgSFS':
+            # sfs_data_file = os.path.join(
+            #     sfs_data_dir, 'estimated_SFS+fixations_of_each_gene_0.txt')
+
+            # gene_id, gbgSFS = parse_genebygene_SFS_file(sfs_data_file)
+
+            # if gene_list:
+            #     gene_id, gbgSFS = filter_gbgSFS(
+            #         gene_id, gbgSFS, gene_list, gene_match_func)
+
+            # _, fd_boot = genebygeneSFS_to_FDboot(gene_id, gbgSFS, 1, species)
+            pass
+
+        elif sfs_format == 'df':
             sfs_data_file = os.path.join(
-                sfs_data_dir, 'estimated_SFS+fixations_of_each_gene_0.txt')
-
-            gene_id, gbgSFS = parse_genebygene_SFS_file(sfs_data_file)
-
-            if gene_list:
-                gene_id, gbgSFS = filter_gbgSFS(
-                    gene_id, gbgSFS, gene_list, gene_match_func)
-
-            _, fd_boot = genebygeneSFS_to_FDboot(gene_id, gbgSFS, 1, species)
-
-        elif sfs_format == 'fdBoot':
-            sfs_data_file = os.path.join(
-                sfs_data_dir, 'freqdist_boot_dat.csv')
-            fd_boot = FrequencyDistributionBootstrap(
-                pd.read_csv(sfs_data_file), species, rep_num
+                sfs_data_dir, 'SFS_bootstrap_data.csv')
+            sfs = SFS(
+                pd.read_csv(sfs_data_file), species, rep_num, cod_type, 
+                description=''
             )
         
-        return fd_boot.get_fdd(bin_num=1, rep_num=0)
-
-    def _sfs_info_formatter(self, sfs_data_dir, site_type_pos):
-        if sfs_data_dir.split('/')[site_type_pos] != 'SI':
-            site_type = 'CDS'
-        else:
-            site_type = 'SI'
-            
-        if site_type == 'CDS':
-            cod_type = sfs_data_dir.split('/')[site_type_pos+2]
-            aa = sfs_data_dir.split('/')[site_type_pos+3].split('_')[0]
-            species = sfs_data_dir.split('/')[site_type_pos+6][:2]
-        else:
-            cod_type = -9
-            aa = -9
-            species = sfs_data_dir.split('/')[site_type_pos+4][:2]
-        chr_name = sfs_data_dir.split('/')[site_type_pos+1].split('_')[1]
-        try:
-            trim = sfs_data_dir.split('/')[site_type_pos+1].split('_')[3]
-        except:
-            trim = -9
-
-        return {
-            'site_type': site_type,
-            'cod_type': cod_type,
-            'aa': aa,
-            'species': species,
-            'chr': chr_name,
-            'trim': trim
-        }
+        return sfs.base_table
 
     def __len__(self):
         return len(self._d)
@@ -328,4 +360,3 @@ class SFSDirMap(DirMap):
         # elif isinstance(key, (tuple, list)):
         #     for k in key:
         #         yield self.df.loc[k, :]
-    
