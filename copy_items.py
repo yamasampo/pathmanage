@@ -3,9 +3,16 @@ import os
 from shutil import copy2
 from .functions import gen_find_file
 
-def read_list(path):
-	with open(path, 'r') as f:
-	    return [l[:-1] for l in f if not l.startswith('itemnum')]
+def read_list(path, apply_func=None):
+    if apply_func == None:
+        apply_func = lambda s: s
+    with open(path, 'r') as f:
+        return [apply_func(l[:-1]) for l in f if not l.startswith('itemnum')]
+
+def to_list_file(item_list, path):
+    with open(path, 'w') as f:
+        print('itemnum: {}'.format(len(item_list)), file=f)
+        print('\n'.join([str(item) for item in item_list]), file=f)
 	    
 def to_filelist(dir_path):
     '''Return a file list in a given directory'''
