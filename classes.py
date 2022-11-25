@@ -7,8 +7,6 @@ import pandas as pd
 from collections import defaultdict
 from pathmanage.functions import gen_find_dir
 from popgen.classes import Database, SFS
-from popgen.reader import parse_genebygene_SFS_file
-from popgen.formatter import filter_gbgSFS
 from popgen.statistics import tests
 
 class DirMap(Database):
