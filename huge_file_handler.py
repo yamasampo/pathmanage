@@ -79,7 +79,7 @@ import os
 from typing import List
 from datetime import datetime
 
-from . import __version__
+from pathmanage import __version__
 from nothingspecial.keeplog import save_proc_setting_as_file
 
 def split(
@@ -256,5 +256,14 @@ def get_output_file_path(output_file_prefix, output_file_id):
 def get_output_file_id_from_path(file_path):
     return int(file_path.split('_')[-1].split('.')[0])
 
+if __name__ == '__main__':
+    import sys
 
+    split(
+        sys.argv[1], 
+        sys.argv[2], 
+        int(sys.argv[3]), 
+        sys.argv[4].split(':'),
+        item_separator = '\t'
+    )
 
