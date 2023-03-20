@@ -1,0 +1,17 @@
+>>ID1
+>1
+Dmel_1  Dsim_2
+>2
+Dmel_1  Dsim_3
+
+>>ID2
+>1
+Dmel_11  Dsim_12
+>2
+Dmel_11  Dsim_13
+>3
+Dmel_21  Dsim_12
+>4
+Dmel_21  Dsim_13
+>5
+Dmel_31  Dsim_32

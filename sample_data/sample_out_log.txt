@@ -1,0 +1,23 @@
+Package name: pathmanage (version 0.0.1)
+
+Process desc: Split a huge file into multiple file.
+Start time: 2023-03-20T16:42:31.848458.
+
+This process runs under the following arguments.
+
+[Input Arguments]
+input_file = ./sample1.txt
+output_file_prefix = ./sample_out
+max_item_num = 3
+item_prefixes = ['Dmel_', 'Dsim_']
+item_separator = 	
+
+[Process log]
+Save contents to ./sample_out_1.txt.
+
+Save contents to ./sample_out_2.txt.
+
+Save contents to ./sample_out_3.txt.
+
+A total of 16 (except empty lines) lines are recognized.
+These lines are saved separately into 3 files.
