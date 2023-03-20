@@ -86,14 +86,15 @@ def split(
         input_file, 
         output_file_prefix, 
         max_item_num    : int, 
-        item_prefixes   : List[str] = []
+        item_prefixes   : List[str] = [],
+        item_separator  : str = '\t'
         ):
     
     start = datetime.now().isoformat()
 
     # In case that user wants to remove prefixes that appear consistently 
     # accross lines
-    # member_num = len(item_prefixes)
+    member_num = len(item_prefixes)
     contents = [] # Strings in this list will be output in the same file
     output_file_id = 1
     first_level_id = ''
@@ -106,7 +107,8 @@ def split(
         'input_file': input_file, 
         'output_file_prefix': output_file_prefix, 
         'max_item_num': max_item_num, 
-        'item_prefixes': item_prefixes
+        'item_prefixes': item_prefixes, 
+        'item_separator': item_separator
     }
     log_file = get_output_file_path(output_file_prefix, 'log')
     with open(log_file, 'a') as log_fh:
@@ -131,6 +133,9 @@ def split(
         for l in input_fh:
             # Cut empty characters at the both ends.  
             line = l.strip()
+            
+            if line == '':
+                continue
 
             # If the current line indicates the first level ID
             if line.startswith('>>'):
@@ -168,12 +173,30 @@ def split(
                     second_level_item_num = 0
 
                 second_level_item_num += 1
-                
-            # else:
-                # Check if items start with a given list of prefixes. 
-                # parts = line.split()
-                # assert len(parts) == member_num
             
+            # If the current line indicates data
+            else:
+                if member_num > 0:
+                    # Split a line to 
+                    parts = line.split()
+                    # Check if the number of items matches to the expectation
+                    assert len(parts) == member_num
+
+                    modified_items = [
+                        ''.join(item.split(exp_pref)[1:]) # Remove prefix
+                        for exp_pref, item in zip(item_prefixes, parts)
+                        if item.startswith(exp_pref)
+                     ]
+                    if len(modified_items) != member_num:
+                        msg = 'There is one or more items that do not start '\
+                              f'with expected prefixes: \nObserved items: '\
+                              f'{parts}\nExpected prefixes: {item_prefixes}'
+                        with open(log_file, 'a') as log_f:
+                            print(msg, file=log_f)
+                        raise ValueError(msg)
+                    
+                    line = item_separator.join(modified_items)
+
             contents.append(line)
             total_line_count += 1
     
@@ -188,8 +211,10 @@ def split(
     total_file_count += 1
     
     with open(log_file, 'a') as log_f:
-        print(f'A total of {total_line_count} lines are recognized.', file=log_f)
-        print(f'These lines are saved separately in {total_file_count} files.', file=log_f)
+        print(f'A total of {total_line_count} (except empty lines) lines are '\
+              f'recognized.', file=log_f)
+        print(f'These lines are saved separately into {total_file_count} files.', 
+              file=log_f)
 
     return total_line_count, total_file_count
 
