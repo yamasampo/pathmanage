@@ -75,12 +75,70 @@ item. In this case, the order of members must be consistent across all the lines
 """
 
 import os
+import bz2
 
 from typing import List
 from datetime import datetime
 
 from pathmanage import __version__
+from nothingspecial.text import to_filelist
 from nothingspecial.keeplog import save_proc_setting_as_file
+
+def compress_all_files(input_dir, suffix, output_dir):
+    """Read the entire file on memory and save into bzip file. 
+    For large file, we can add another option for read and output in chunk. 
+    lzma may be a good module for this possibility. 
+    This web article has a good demonstration:
+    https://towardsdatascience.com/all-the-ways-to-compress-and-archive-files-in-python-e8076ccedb4b 
+
+    """
+    start = datetime.now().isoformat()
+    input_args = {
+        'input_dir': input_dir, 
+        'suffix': suffix,
+        'output_dir': output_dir
+    }
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+        
+    log_file = os.path.join(output_dir, '0.log.txt')
+    with open(log_file, 'a') as log_fh:
+        save_proc_setting_as_file(
+            log_fh, 
+            package_name = 'pathmanage', 
+            proc_desc = 'Compress all files in an input directory.', 
+            start_time = start, 
+            separator = ' = ',
+            package_version = __version__, 
+            **input_args
+        )
+        print('\n[Process log]', file=log_fh)
+
+    in_fnames = [
+        fname 
+        for fname in os.listdir(input_dir) 
+        if fname.endswith(suffix)
+    ]
+    in_fpaths = [os.path.join(input_dir, fname) for fname in in_fnames]
+    out_fnames = [
+        fname + '.bz2'
+        for fname in in_fnames
+    ]
+    out_fpaths = [os.path.join(output_dir, fname) for fname in out_fnames]
+
+    for in_fpath, out_fpath in zip(in_fpaths, out_fpaths):
+        with open(in_fpath, 'rb') as in_fh, bz2.open(out_fpath, 'wb') as out_fh:
+            out_fh.write(in_fh.read())
+
+            with open(log_file, 'a') as log_fh:
+                print(f'\nOutput {out_fpath}')
+
+    out_flist = to_filelist(output_dir)
+
+    with open(log_file, 'a') as log_fh:
+        print(f'A total of {len(out_flist)} files are saved.')
+
+    return out_flist
 
 def split(
         input_file, 
@@ -258,12 +316,22 @@ def get_output_file_id_from_path(file_path):
 
 if __name__ == '__main__':
     import sys
+    mode = sys.argv[1]
 
-    split(
-        sys.argv[1], 
-        sys.argv[2], 
-        int(sys.argv[3]), 
-        sys.argv[4].split(':'),
-        item_separator = '\t'
-    )
+    if mode not in {'split', 'compress_all'}:
+        raise ValueError('Please choose "split" or "compress_all"')
+    
+    if mode == 'split':
+        split(
+            sys.argv[2], 
+            sys.argv[3], 
+            int(sys.argv[4]), 
+            sys.argv[5].split(':'),
+            item_separator = '\t'
+        )
+
+    else:
+        compress_all_files(
+            sys.argv[2], sys.argv[3], sys.argv[4]
+        )
 
