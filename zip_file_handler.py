@@ -1,12 +1,12 @@
 import os
 import zipfile
 
-def get_file_list_from_zipped_folder(zip_file_path):
+def get_file_list_from_zipped_folder(zip_file_path, filelist_name: str='0.filelist'):
     # Get folder name without an extention
     fname = os.path.basename(zip_file_path).split('.zip')[0]
 
     # Get a path to list file
-    flist_fname = f'{fname}/0.filelist'
+    flist_fname = f'{fname}/{filelist_name}'
 
     # Open zip file
     with zipfile.ZipFile(zip_file_path) as z:
